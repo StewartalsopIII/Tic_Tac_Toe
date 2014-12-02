@@ -1,104 +1,130 @@
 class Player
-  attr_accessor :choice
-  attr_reader :name
+  attr_reader :name, :marker
 
-  def initialize(name)
+  def initialize(name, marker)
     @name = name
+    @marker = marker
   end
 end
 
-class Human < Player
-  def pick_hand
-    begin
-      puts "\nEnter \'r\' for rock, \'p\' for paper, or \'s\' for scissors: "
-      puts 
-      self.choice = gets.chomp.downcase
-    end until Game::OPTIONS.keys.include?(choice)
-  end
-end
-
-class Computer < Player 
-  def pick_hand
-    self.choice = Game::OPTIONS.keys.sample 
-  end
-end
-
-class Game 
-  OPTIONS = {'r' => 'rock', 's' => 'scissors', 'p' => 'paper'}
-
-  attr_reader :player, :computer
-
-  def initialize 
-    @player = Human.new('You')
-    @computer = Computer.new('The computer')
+class Board
+  WINNING_LINES = [[1,2,3], [4,5,6], [7,8,9], [1,4,7], [2, 5, 8], [3,6,9], [1,5,9], [3,5,7]]
+  def initialize
+    @data = {}
+    (1..9).each {|position| @data[position] = Square.new(' ')}
   end
 
-  def intro
+  def draw
     system 'clear'
-    puts "Welcome to Rock-Paper-Scissors"
-    puts "Rock smashes Scissors, Paper wraps Rock, and Scissors cuts Paper"
+    puts
+    puts "      |       |"
+    puts "  #{@data[1].value}   |  #{@data[2].value}    |  #{@data[3].value}"
+    puts "      |       |"
+    puts "------+-------+-------"
+    puts "      |       |"
+    puts "  #{@data[4].value}   |  #{@data[5].value}    |  #{@data[6].value}"
+    puts "      |       |"
+    puts "------+-------+-------"
+    puts "      |       |"
+    puts "  #{@data[7].value}   |  #{@data[8].value}    |  #{@data[9].value}"
+    puts "      |       |"
+    puts
   end
 
-  def message(winning_hand)
-    case winning_hand
-    when 'r'
-      puts "\nRock breaks scissors!"
-    when 'p'
-      puts "\nPaper wraps rock!"
-    when 's'
-      puts "\nScissors cuts paper!"
+  def all_squares_marked?
+    empty_squares.size == 0
+  end
+
+  def empty_squares
+    @data.select {|k, square| square.value == ' '}.values
+  end
+
+  def empty_positions
+    @data.select {|_, square| square.empty? }.keys
+  end
+
+  def mark_square(position, marker)
+    @data[position].mark(marker)
+  end
+
+  def winning_condition?(marker)
+    WINNING_LINES.each do |line|
+      return true if @data[line[0]].value == marker && @data[line[1]].value == marker && 
+      @data[line[2]].value == marker
     end
+    false
+  end
+end
+
+class Square
+  attr_accessor :value
+
+  def initialize(value)
+    @value = value
   end
 
-  def compare
-    if player.choice == computer.choice
-      puts "You both chose the same thing!"
-      puts "Its a tie"
-    elsif (player.choice == 'r' && computer.choice == 's') ||
-          (player.choice == 'p' && computer.choice == 'r') ||
-          (player.choice == 's' && computer.choice == 'p')
-      puts "\nYou chose #{OPTIONS[(player.choice)]} and the"\
-           " computer chose #{OPTIONS[(computer.choice)]}."
-      message(player.choice)
-      puts "\nYou won!"
+  def mark(marker)
+    @value = marker
+  end
+
+  def occupied?
+    @value != ' '
+  end
+
+  def empty?
+    @value == ' '
+  end
+end
+
+class Game
+
+  def initialize
+    @board = Board.new
+    @human = Player.new("Stewart", "X")
+    @computer = Player.new("R2D2", "O")
+    @current_player = @human
+  end
+
+  def current_player_marks_square
+    if @current_player == @human
+      begin
+        puts "Choose a position (1-9):"
+        position = gets.chomp.to_i
+      end until @board.empty_positions.include?(position)
     else
-      puts "\nYou chose #{OPTIONS[(player.choice)]} and the" \
-           " computer chose #{OPTIONS[(computer.choice)]}"
-      message(computer.choice)
-      puts "\nThe Computer won!"
+      position = @board.empty_positions.sample
     end
+    @board.mark_square(position, @current_player.marker)
   end
 
-  def replay
-    play_again_choice = 'n'
+  def current_player_win?
+    @board.winning_condition?(@current_player.marker)
+  end
 
-    while play_again_choice != 'y'
-      puts "\nWould you like to play again? (Y/N)"
-      puts
-
-      play_again_choice = gets.chomp.downcase
-
-      unless %w(y n).include?(play_again_choice)
-        puts "\nError. Invalid entry. Please enter 'y' or 'n'."
-        next
-      end
-
-      if play_again_choice == 'y'
-        Game.new.play
-      elsif play_again_choice == 'n'
-        puts "\nThanks for playing!"
-        exit
-      end
+  def alternate_player
+    if @current_player == @human
+      @current_player = @computer
+    else
+      @current_player = @human
     end
   end
-        
 
   def play
-    intro
-    player.pick_hand
-    computer.pick_hand
-    compare
-    replay
+    @board.draw 
+    loop do 
+      current_player_marks_square 
+      @board.draw
+      if current_player_win?
+        puts "The winner is #{@current_player.name}"
+        break
+      elsif @board.all_squares_marked?
+        puts "its a tie"
+        break
+      else
+        alternate_player
+      end
+    end
+    puts "bye"
   end
 end
 
